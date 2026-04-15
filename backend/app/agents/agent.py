@@ -115,7 +115,10 @@ async def node_detect_language_intent(state: AgentState) -> AgentState:
     """
     llm = get_llm(temperature=0.1)
 
-    Analyze the user message and respond ONLY with a JSON object. The system is now English-centric.
+    system_prompt = """
+    Analyze the user message and respond ONLY with a JSON object.
+    The system is now English-centric.
+    """
 
 Respond ONLY with valid JSON. No markdown, no explanation.
 
