@@ -102,9 +102,9 @@ AI-powered multilingual scholarship discovery engine for Tamil Nadu students.
 - ⚡ Groq Llama 3 70B Inference
 - 🛡️ Rate Limiting + Prompt Guard
     """,
-    openapi_url=f"/api/v1/openapi.json",
-    docs_url="/api/v1/docs",
-    redoc_url="/api/v1/redoc",
+    docs_url="/docs",
+    openapi_url="/openapi.json",
+    redoc_url="/redoc",
     lifespan=lifespan,
 )
 
