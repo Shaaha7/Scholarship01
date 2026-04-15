@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: tamilscholar_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tamilscholar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tamilscholar_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-tamilscholar_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tamilscholar}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: tamilscholar_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tamilscholar_backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tamilscholar}:${POSTGRES_PASSWORD:-tamilscholar_secret}@postgres:5432/${POSTGRES_DB:-tamilscholar_db}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./scripts:/app/scripts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tamilscholar_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  adminer:
+    image: adminer:latest
+    container_name: tamilscholar_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: tamilscholar_network

@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 99%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 33%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 24 95% 53%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+    --radius: 0.75rem;
+  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+  .font-tamil { font-family: var(--font-noto-sans-tamil), serif; line-height: 1.8; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-muted; }
+  ::-webkit-scrollbar-thumb { @apply bg-muted-foreground/30 rounded-full; }
+}
+
+@layer components {
+  .chat-bubble-user { @apply bg-blue-700 text-white rounded-2xl rounded-br-sm px-4 py-3 max-w-[80%] ml-auto shadow-sm; }
+  .chat-bubble-ai { @apply bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 max-w-[85%] shadow-sm; }
+  .scholarship-card { @apply bg-card border border-border rounded-xl p-5 hover:shadow-md hover:border-blue-200 transition-all duration-200; }
+  .badge-BC { @apply bg-blue-100 text-blue-800 border border-blue-200; }
+  .badge-MBC { @apply bg-purple-100 text-purple-800 border border-purple-200; }
+  .badge-SC { @apply bg-green-100 text-green-800 border border-green-200; }
+  .badge-ST { @apply bg-amber-100 text-amber-800 border border-amber-200; }
+  .badge-General { @apply bg-gray-100 text-gray-800 border border-gray-200; }
+  .gov-stripe { background: linear-gradient(90deg, #138808 0%, #138808 33%, #ffffff 33%, #ffffff 66%, #FF9933 66%, #FF9933 100%); height: 4px; }
+  .typing-dot { @apply w-2 h-2 bg-muted-foreground rounded-full animate-bounce; }
+  .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+}

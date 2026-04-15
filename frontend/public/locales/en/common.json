@@ -1,0 +1,29 @@
+{
+  "nav": {
+    "home": "Home",
+    "scholarships": "Scholarships",
+    "chat": "AI Chat",
+    "admin": "Admin"
+  },
+  "hero": {
+    "title": "Find Your Scholarship",
+    "subtitle": "Tamil Nadu Government Scholarship Portal",
+    "cta": "Chat with AI Guide",
+    "browse": "Browse Scholarships"
+  },
+  "chat": {
+    "placeholder": "Ask about scholarships in Tamil, Tanglish, or English...",
+    "send": "Send",
+    "clear": "Clear Chat",
+    "typing": "AI is thinking..."
+  },
+  "scholarship": {
+    "apply": "Apply Now",
+    "save": "Save",
+    "remind": "Set Reminder",
+    "deadline": "Deadline",
+    "amount": "Amount",
+    "category": "Category",
+    "provider": "Provider"
+  }
+}

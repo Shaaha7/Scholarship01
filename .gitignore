@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.env
+!.env.example
+*.pem
+
+# Node
+node_modules/
+.next/
+.vercel/
+dist/
+*.local
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+*.override.yml
+
+# Logs
+*.log
+logs/
+
+# ML Models (large files)
+models/
+*.bin
+*.onnx
+
+# Database
+*.db
+*.sqlite
+
+# Uploads
+uploads/
+tmp/
