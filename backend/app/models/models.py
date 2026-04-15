@@ -289,4 +289,4 @@ class DocumentChunk(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Optional: store embedding locally (for small deployments without Pinecone)
-    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(1024))
+    embedding: Mapped[Optional[List[float]]] = mapped_column(JSONB, nullable=True)
