@@ -1,9 +1,8 @@
 import axios from "axios";
 import Cookies from "js-cookie";
 
-// Use same-origin API routes so the app works for friends too.
-// Next.js rewrites proxy `/api/v1/*` to the backend container.
-const API_BASE = "";
+// Use Render backend URL in production, local rewrites in development
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://scholarship01.onrender.com";
 
 export const apiClient = axios.create({
   baseURL: `${API_BASE}/api/v1`.replace(/\/+$/, ""),

@@ -18,15 +18,12 @@ const nextConfig = {
     ],
   },
   async rewrites() {
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://scholarship01.onrender.com";
     return [
-      // Proxy API calls to the backend container (so public sharing works).
+      // Proxy API calls to Render backend in production
       {
         source: "/api/v1/:path*",
-        destination: "http://tamilscholar_backend:8000/api/v1/:path*",
-      },
-      {
-        source: "/api/backend/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/v1/:path*`,
+        destination: `${backendUrl}/api/v1/:path*`,
       },
     ];
   },

@@ -214,42 +214,94 @@ docker exec tamilscholar_backend python /app/scripts/ingest_scholarships.py --se
 
 ### Production Deployment Options
 
-#### Option 1: Railway (Recommended for Full Stack)
+#### Option 1: Render + Supabase (Recommended - Best Free Tier)
 
-1. **Backend on Railway**
-   - Create a new **Web Service**
-   - Connect your GitHub repository
+**Note: Railway has storage limits. Render + Supabase provides better free tier storage.**
+
+1. **Backend on Render**
+   - Create a new **Web Service** on [render.com](https://render.com)
    - Root directory: `tamilscholar-pro/backend`
    - Build command: `pip install -r requirements.txt`
    - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - Add environment variables from `.env.example`
-   - Add PostgreSQL, Redis, and RabbitMQ from Railway marketplace
+   - Add all environment variables from `.env.example`
 
-2. **Frontend on Vercel**
+2. **Supabase for Database & Redis** (Free tier: 500MB PostgreSQL + Redis)
+   - Create account at [supabase.com](https://supabase.com)
+   - Create a new project
+   - Enable pgvector extension in SQL editor: `CREATE EXTENSION vector;`
+   - Get connection string from Settings > Database
+   - Use Supabase's built-in Redis or add Redis from Render marketplace
+   - Add RabbitMQ from Render marketplace (or use Supabase Edge Functions for async tasks)
+
+3. **Frontend on Vercel**
    ```bash
    cd tamilscholar-pro/frontend
    npx vercel --prod
    ```
-   - Set `NEXT_PUBLIC_API_URL` to your Railway backend URL
+   - Set `NEXT_PUBLIC_API_URL` to your Render backend URL
    - Add environment variables for OAuth
 
-#### Option 2: Render (Backend) + Vercel (Frontend)
+#### Option 2: Fly.io + Neon (Alternative Free Tier)
 
-**Backend on Render:**
-1. Create a new **Web Service** on [render.com](https://render.com)
-2. Root directory: `backend`
-3. Build command: `pip install -r requirements.txt`
-4. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Add PostgreSQL, Redis, and RabbitMQ from Render marketplace
-6. Add all environment variables from `.env.example`
+1. **Backend on Fly.io**
+   - Install Fly CLI: `curl -L https://fly.io/install.sh | sh`
+   - Create account at [fly.io](https://fly.io)
+   - Deploy: `cd tamilscholar-pro/backend && fly launch`
+   - Add volumes for persistent storage
+   - Add environment variables
 
-**Frontend on Vercel:**
+2. **Neon PostgreSQL** (Free tier: 0.5GB with pgvector)
+   - Create account at [neon.tech](https://neon.tech)
+   - Create project with pgvector enabled
+   - Use connection string in Fly.io environment
+
+3. **Upstash Redis** (Free tier: 10,000 commands/day)
+   - Create account at [upstash.com](https://upstash.com)
+   - Create Redis database
+   - Use connection string in Fly.io environment
+
+4. **Frontend on Vercel** (same as above)
+
+#### Option 3: AWS Free Tier (12 Months Free - Requires Credit Card)
+
+1. **AWS ECS + RDS PostgreSQL + ElastiCache**
+   - Create AWS account (12 months free tier eligible)
+   - RDS PostgreSQL with pgvector (750 hours/month free)
+   - ElastiCache Redis (750 hours/month free)
+   - Deploy backend to ECS Fargate
+   - Deploy frontend to Amplify or CloudFront + S3
+
+#### Option 4: Self-Hosted (VPS - Full Control)
+
+**Recommended VPS Providers:**
+- **DigitalOcean** - $4/month (1GB RAM, 25GB SSD)
+- **Linode** - $5/month (1GB RAM, 25GB SSD)
+- **Hetzner** - €4/month (2GB RAM, 40GB SSD) - Best value
+
+**Deployment Steps:**
 ```bash
-cd frontend
-npx vercel --prod
+# On your VPS:
+# 1. Install Docker and Docker Compose
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+
+# 2. Clone repository
+git clone https://github.com/your-org/tamilscholar-pro.git
+cd tamilscholar-pro/tamilscholar-pro
+
+# 3. Set environment variables
+cp backend/.env.example backend/.env
+nano backend/.env  # Add your API keys
+
+# 4. Start services
+docker compose up -d
+
+# 5. Configure reverse proxy (Nginx)
+# 6. Add SSL certificate (Let's Encrypt)
+# 7. Point domain to VPS IP
 ```
 
-#### Option 3: AWS ECS (Enterprise)
+#### Option 5: AWS ECS (Enterprise)
 
 ```bash
 # Build and push Docker images

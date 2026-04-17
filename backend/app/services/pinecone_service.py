@@ -146,3 +146,15 @@ class PineconeService:
             )
         except Exception as e:
             logger.error(f"Pinecone delete error: {e}")
+
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get Pinecone service statistics."""
+        index = self._get_index()
+        return {
+            "connected": index is not None,
+            "index_name": settings.PINECONE_INDEX_NAME if index else None,
+        }
+
+
+# Global Pinecone service instance
+pinecone_service = PineconeService()
