@@ -24,6 +24,7 @@ from app.schemas.auth import (
     RegisterRequest, TokenPayload, UserResponse, UserUpdateRequest,
 )
 from app.services.auth_service import AuthService
+from app.services.oauth_service import oauth_service
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -113,3 +114,77 @@ async def update_me(
     auth_service = AuthService(db)
     updated = await auth_service.update_profile(current_user.id, body)
     return UserResponse.model_validate(updated)
+
+
+# ── OAuth 2.0 Endpoints ───────────────────────────────────────────────────────────
+@router.get("/google/url")
+async def get_google_auth_url():
+    """Get Google OAuth authorization URL."""
+    url = oauth_service.get_google_auth_url()
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Google OAuth not configured"
+        )
+    return {"auth_url": url}
+
+
+@router.post("/google/callback", response_model=LoginResponse)
+async def google_oauth_callback(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Handle Google OAuth callback.
+    Exchange code for tokens, get user info, and create/login user.
+    """
+    try:
+        # Exchange code for tokens
+        tokens = await oauth_service.exchange_code_for_tokens(code)
+        
+        # Get user info from Google
+        user_info = await oauth_service.get_google_user_info(tokens["access_token"])
+        
+        # Check if user exists by email
+        auth_service = AuthService(db)
+        from app.models.models import User
+        from sqlalchemy import select
+        
+        result = await db.execute(
+            select(User).where(User.email == user_info["email"])
+        )
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            # Login existing user
+            login_response = await auth_service.login(
+                existing_user.email,
+                password=None,  # OAuth users don't need password
+                oauth_provider="google",
+                oauth_id=user_info["id"]
+            )
+        else:
+            # Create new user
+            register_data = RegisterRequest(
+                email=user_info["email"],
+                password=None,  # Will be set to random for OAuth users
+                full_name=user_info.get("name", ""),
+                oauth_provider="google",
+                oauth_id=user_info["id"]
+            )
+            user = await auth_service.register_oauth(register_data)
+            login_response = await auth_service.login(
+                user.email,
+                password=None,
+                oauth_provider="google",
+                oauth_id=user_info["id"]
+            )
+        
+        return login_response
+        
+    except Exception as e:
+        logger.error(f"OAuth callback error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"OAuth authentication failed: {str(e)}"
+        )

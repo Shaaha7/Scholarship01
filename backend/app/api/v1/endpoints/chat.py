@@ -141,6 +141,125 @@ async def send_message(
     )
 
 
+@router.post("/message/stream")
+@limiter.limit(settings.RATE_LIMIT_CHAT)
+async def send_message_stream(
+    request: Request,
+    body: ChatMessageRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[Any] = None,
+):
+    """
+    Send a message to the TamilScholar AI agent with streaming response.
+    Returns Server-Sent Events (SSE) for real-time token streaming.
+    """
+    import json
+    
+    # Try to get current user if credentials provided
+    try:
+        if not current_user:
+            auth_header = request.headers.get("authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+                from app.services.auth_service import AuthService
+                auth_service = AuthService(db)
+                try:
+                    current_user = await auth_service.get_current_user(token)
+                except:
+                    current_user = None
+    except:
+        current_user = None
+
+    # Get or create session
+    session = None
+    if body.session_id:
+        stmt = select(ChatSession).where(ChatSession.session_token == body.session_id)
+        if current_user:
+            stmt = stmt.where(ChatSession.user_id == current_user.id)
+        else:
+            stmt = stmt.where(ChatSession.user_id.is_(None))
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+    if not session:
+        session = ChatSession(
+            user_id=current_user.id if current_user else None,
+            session_token=secrets.token_urlsafe(32),
+            messages=[],
+        )
+        db.add(session)
+        await db.flush()
+
+    stored_messages = session.messages or []
+    history = stored_messages[-8:]
+
+    async def event_generator():
+        """Generate SSE events for streaming response."""
+        try:
+            # Send session ID first
+            yield f"data: {json.dumps({'type': 'session_id', 'session_id': session.session_token})}\n\n"
+            
+            # Run agent with streaming
+            agent_result = await run_scholarship_agent_v2(
+                user_message=body.message,
+                session_id=str(session.id),
+                user_profile=current_user.profile_data or {} if current_user else {},
+                conversation_history=history,
+                db=db,
+            )
+            
+            # Stream the response character by character
+            response = agent_result["response"]
+            for i, char in enumerate(response):
+                yield f"data: {json.dumps({'type': 'token', 'content': char, 'index': i})}\n\n"
+                # Small delay to simulate streaming effect
+                import asyncio
+                await asyncio.sleep(0.01)
+            
+            # Send final metadata
+            yield f"data: {json.dumps({'type': 'done', 'language': agent_result.get('language', 'en'), 'intent': str(agent_result.get('intent', 'general_query')), 'scholarships': agent_result.get('scholarships', [])[:6], 'sources': agent_result.get('sources', [])})}\n\n"
+            
+            # Persist messages after streaming complete
+            user_msg = ChatMessage(
+                session_id=session.id,
+                role="user",
+                content=body.message,
+                language=agent_result.get("extra_metadata", {}).get("detected_language", "en"),
+            )
+            assistant_msg = ChatMessage(
+                session_id=session.id,
+                role="assistant",
+                content=response,
+                language=agent_result.get("language", "en"),
+                extra_metadata={
+                    "scholarships_surfaced": len(agent_result.get("scholarships", [])),
+                    "intent": str(agent_result.get("intent", "")),
+                    "sources": agent_result.get("sources", []),
+                },
+            )
+            db.add(user_msg)
+            db.add(assistant_msg)
+            session.detected_language = agent_result.get("language", "en")
+            session.messages = (stored_messages + [
+                {"role": "user", "content": body.message},
+                {"role": "assistant", "content": response},
+            ])[-20:]
+            await db.commit()
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
 @router.get("/sessions", response_model=List[ChatSessionResponse])
 async def list_sessions(
     db: AsyncSession = Depends(get_db),

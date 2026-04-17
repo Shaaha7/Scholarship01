@@ -7,10 +7,13 @@ Production-ready FastAPI app with:
 - Prompt Guard middleware
 - CORS configuration
 - Startup database initialization
+- Sentry error tracking
+- Redis caching
 """
 import logging
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -25,13 +28,22 @@ from app.core.config import settings
 from app.db.session import create_tables
 from app.middleware.prompt_guard import PromptGuardMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
+from app.middleware.csrf import CSRFMiddleware
+from app.services.redis_service import redis_service
+from app.utils.logging_config import get_logger
 
-# ── Logging Setup ─────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.DEBUG if settings.DEBUG else logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-)
-logger = logging.getLogger(__name__)
+# ── Sentry Integration ─────────────────────────────────────────────────────────
+if settings.ENVIRONMENT == "production":
+    sentry_sdk.init(
+        dsn=getattr(settings, 'SENTRY_DSN', None),
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        environment=settings.ENVIRONMENT,
+        release=settings.APP_VERSION,
+    )
+
+# ── Structured Logging ─────────────────────────────────────────────────────────
+logger = get_logger(__name__)
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/hour"])
@@ -43,6 +55,9 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
+    # Connect to Redis
+    await redis_service.connect()
+
     # Create database tables
     if settings.ENVIRONMENT == "development":
         await create_tables()
@@ -53,6 +68,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # Disconnect Redis
+    await redis_service.disconnect()
     logger.info("🛑 Shutting down TamilScholar Pro")
 
 
@@ -116,7 +133,11 @@ app.state.limiter = limiter
 # 1. Security Headers
 app.add_middleware(SecurityHeadersMiddleware)
 
-# 2. Prompt Guard (blocks jailbreaks before they hit endpoints)
+# 2. CSRF Protection
+if settings.ENVIRONMENT == "production":
+    app.add_middleware(CSRFMiddleware)
+
+# 3. Prompt Guard (blocks jailbreaks before they hit endpoints)
 app.add_middleware(PromptGuardMiddleware)
 
 # 3. Trusted Hosts
@@ -163,12 +184,57 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Health check endpoint for load balancers."""
-    return {
+    health_status = {
         "status": "healthy",
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
+        "dependencies": {},
     }
+    
+    # Check Redis
+    try:
+        redis_stats = await redis_service.get_stats()
+        health_status["dependencies"]["redis"] = {
+            "status": "healthy" if redis_stats.get("connected") else "unhealthy",
+            "details": redis_stats,
+        }
+    except Exception as e:
+        health_status["dependencies"]["redis"] = {
+            "status": "unhealthy",
+            "error": str(e),
+        }
+    
+    # Check Database
+    try:
+        from app.db.session import engine
+        async with engine.connect() as conn:
+            await conn.execute("SELECT 1")
+        health_status["dependencies"]["database"] = {
+            "status": "healthy",
+        }
+    except Exception as e:
+        health_status["dependencies"]["database"] = {
+            "status": "unhealthy",
+            "error": str(e),
+        }
+        health_status["status"] = "degraded"
+    
+    # Check Pinecone
+    try:
+        from app.services.pinecone_service import pinecone_service
+        pinecone_stats = await pinecone_service.get_stats()
+        health_status["dependencies"]["pinecone"] = {
+            "status": "healthy" if pinecone_stats.get("connected") else "unhealthy",
+            "details": pinecone_stats,
+        }
+    except Exception as e:
+        health_status["dependencies"]["pinecone"] = {
+            "status": "unhealthy",
+            "error": str(e),
+        }
+    
+    return health_status
 
 
 @app.get("/", tags=["Root"])
